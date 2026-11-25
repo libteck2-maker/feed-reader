@@ -89,6 +89,13 @@
     display:block; margin:12px auto 0; background:var(--green); color:#f5f1e6;
     border:none; border-radius:999px; padding:8px 26px; font-size:14px; cursor:pointer;
   }
+  .more{text-align:center; margin:28px 0 0}
+  .more .more-info{color:var(--muted); font-size:12px; letter-spacing:.05em; margin:0 0 10px}
+  .more button{
+    border:1px solid var(--green); background:var(--card); color:var(--green);
+    border-radius:999px; padding:8px 22px; font-size:13.5px; cursor:pointer;
+  }
+  .more button:disabled{opacity:.55}
   .foot{color:var(--muted); font-size:11.5px; text-align:center; margin:34px 0 0; letter-spacing:.06em}
   .bar{display:flex; align-items:center; gap:10px; margin:2px 0 12px}
   .bar .upd{color:var(--muted); font-size:12px; letter-spacing:.05em}
@@ -116,6 +123,9 @@ let filterPerson = '';    // '' = first person
 let keyword = '';
 let lastFetch = null;
 let refreshing = false;
+let loadLimit = 100;      // 取得件数。「過去をもっと読み込む」で +200 ずつ増える
+let reachedEnd = false;   // 返却件数が上限未満＝もう古いポストが無い
+let loadingMore = false;
 
 function esc(s){
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -228,11 +238,21 @@ function render(){
       <div class="counts"><span>♥ ${t.likeCount}</span><span>↻ ${t.retweetCount}</span><span>表示 ${t.viewCount}</span><span class="open-hint">Xで開く ↗</span></div>
     </article>`;
   }
+  const personTotal = person.accounts.reduce((s, a) => s + (a.postCount || 0), 0);
+  const loadedCount = (feed.posts || []).filter(t => userSet.has(t.username)).length;
+  if (personTotal > 0){
+    h += `<div class="more"><div class="more-info">${loadedCount}件を表示中（全${personTotal}件）</div>`;
+    if (!reachedEnd && loadedCount < personTotal)
+      h += `<button id="more" ${loadingMore ? 'disabled' : ''}>${loadingMore ? '読み込み中…' : '過去をもっと読み込む'}</button>`;
+    h += '</div>';
+  }
   h += '<p class="foot">新しいポストは自動で積み上がります</p>';
   app.innerHTML = h;
 
   const rb = document.getElementById('refresh');
   if (rb) rb.onclick = async () => { refreshing = true; render(); await load(true); refreshing = false; render(); };
+  const mb = document.getElementById('more');
+  if (mb) mb.onclick = () => { loadMore(); };
   app.querySelectorAll('[data-person]').forEach(el => el.onclick = () => { filterPerson = el.dataset.person; filterAccount = ''; render(); });
   app.querySelectorAll('[data-acc]').forEach(el => el.onclick = () => { filterAccount = el.dataset.acc; render(); });
   const kw = document.getElementById('kw');
@@ -247,7 +267,8 @@ async function load(keepOnError){
   const key = getKey();
   if (!key){ gate(); return; }
   try {
-    feed = await rpc('xwatch_feed', { p_secret: key, p_limit: 300 });
+    feed = await rpc('xwatch_feed', { p_secret: key, p_limit: loadLimit });
+    reachedEnd = (feed.posts || []).length < loadLimit;
     lastFetch = new Date();
     render();
   } catch (e) {
@@ -255,6 +276,21 @@ async function load(keepOnError){
     localStorage.removeItem(LS_KEY);
     gate('鍵が違うか、読み込めませんでした');
   }
+}
+async function loadMore(){
+  if (loadingMore) return;
+  const y = window.scrollY;
+  loadingMore = true; render(); window.scrollTo(0, y);
+  loadLimit += 200;
+  try {
+    const f = await rpc('xwatch_feed', { p_secret: getKey(), p_limit: loadLimit });
+    feed = f;
+    reachedEnd = (feed.posts || []).length < loadLimit;
+    lastFetch = new Date();
+  } catch (e) {
+    loadLimit -= 200;
+  }
+  loadingMore = false; render(); window.scrollTo(0, y);
 }
 load();
 </script>

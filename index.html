@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#1e3d2f">
+<title>Reader</title>
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>
+  :root{
+    --bg:#f7f3ea; --card:#fffdf7; --ink:#26302a; --muted:#7a8272;
+    --line:#e3ddcc; --green:#1e3d2f; --green-soft:#e9efe6; --accent:#b98a2f;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:"Hiragino Kaku Gothic ProN","Hiragino Sans","Yu Gothic",sans-serif;
+    font-size:15px; line-height:1.75;
+  }
+  .wrap{max-width:640px; margin:0 auto; padding:28px 18px 64px}
+  header.top{margin:10px 0 6px}
+  h1{
+    font-family:"Hiragino Mincho ProN","Yu Mincho","YuMincho",serif;
+    font-weight:600; font-size:26px; letter-spacing:.06em; color:var(--green);
+    margin:0 0 2px;
+  }
+  .sub{color:var(--muted); font-size:12.5px; letter-spacing:.08em}
+  .rule{height:1px; background:var(--line); margin:18px 0 14px}
+  .chips{display:flex; flex-wrap:wrap; gap:8px; margin:0 0 10px}
+  .chip{
+    border:1px solid var(--line); background:var(--card); color:var(--ink);
+    border-radius:999px; padding:5px 14px; font-size:13px; cursor:pointer;
+  }
+  .chip.on{background:var(--green); color:#f5f1e6; border-color:var(--green)}
+  .search{margin:6px 0 4px}
+  .search input{
+    width:100%; border:1px solid var(--line); background:var(--card);
+    border-radius:10px; padding:9px 12px; font-size:14px; color:var(--ink); outline:none;
+  }
+  .day{
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif;
+    color:var(--green); font-size:15px; letter-spacing:.1em; margin:26px 0 10px;
+  }
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; margin:0 0 12px; cursor:pointer;
+  }
+  .card:active{background:var(--green-soft)}
+  .rt-head{font-size:12.5px; color:var(--muted); margin:0 0 8px; letter-spacing:.03em}
+  .rt-head b{color:var(--green); font-weight:600}
+  .who{display:flex; align-items:center; gap:10px; margin:0 0 6px}
+  .who img{width:38px; height:38px; border-radius:50%; object-fit:cover; background:var(--green-soft)}
+  .who .nm{font-weight:700; font-size:14.5px; line-height:1.3}
+  .who .un{color:var(--muted); font-size:12.5px; line-height:1.3}
+  .who .tm{margin-left:auto; color:var(--muted); font-size:12px; white-space:nowrap}
+  .body{font-size:14.5px; white-space:pre-wrap; word-break:break-word; margin:2px 0 0}
+  .body a{color:var(--green); text-decoration:underline; text-underline-offset:2px}
+  .orig{
+    display:inline-flex; align-items:center; gap:6px; margin:0 0 8px;
+    background:var(--green-soft); border-radius:999px; padding:3px 12px 3px 4px;
+    font-size:12.5px; color:var(--green); text-decoration:none;
+  }
+  .orig img{width:22px; height:22px; border-radius:50%}
+  .media{display:grid; gap:6px; margin:10px 0 2px}
+  .media.n1{grid-template-columns:1fr}
+  .media.n2{grid-template-columns:1fr 1fr}
+  .media.n3,.media.n4{grid-template-columns:1fr 1fr}
+  .media img{width:100%; height:100%; max-height:320px; object-fit:cover; border-radius:10px; display:block}
+  .media .vwrap{position:relative}
+  .media .vmark{
+    position:absolute; right:8px; bottom:8px; background:rgba(20,30,24,.72); color:#fff;
+    font-size:11px; border-radius:6px; padding:1px 8px;
+  }
+  .counts{color:var(--muted); font-size:12px; margin:10px 0 0; display:flex; gap:16px}
+  .open-hint{color:var(--accent); font-size:11.5px; margin-left:auto; letter-spacing:.05em}
+  .empty,.gate{
+    text-align:center; color:var(--muted); padding:56px 20px;
+    font-family:"Hiragino Mincho ProN","Yu Mincho",serif; letter-spacing:.08em;
+  }
+  .gate input{
+    border:1px solid var(--line); background:var(--card); border-radius:10px;
+    padding:10px 12px; font-size:14px; width:min(320px,84vw); margin-top:14px; outline:none;
+  }
+  .gate button{
+    display:block; margin:12px auto 0; background:var(--green); color:#f5f1e6;
+    border:none; border-radius:999px; padding:8px 26px; font-size:14px; cursor:pointer;
+  }
+  .foot{color:var(--muted); font-size:11.5px; text-align:center; margin:34px 0 0; letter-spacing:.06em}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <div class="empty">読み込んでいます…</div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://csqhsblosekjkjywgbcn.supabase.co';
+const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNzcWhzYmxvc2VramtqeXdnYmNuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ5MjU1MDgsImV4cCI6MjExMDUwMTUwOH0.aGQh7DR9hKtMU5sVAViApeb8q6As5TfT-eeDmq-Vp6s';
+const LS_KEY = 'xwatch-key';
+
+const app = document.getElementById('app');
+let feed = null;
+let filterAccount = '';   // '' = all
+let filterPerson = '';    // '' = first person
+let keyword = '';
+
+function esc(s){
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function linkify(text){
+  let out = esc(text);
+  out = out.replace(/https?:\/\/[^\s]+/g, u => `<a href="${u}" data-ext="1">${u}</a>`);
+  out = out.replace(/(^|[^\w@])@([A-Za-z0-9_]{1,30})/g, (m, pre, name) =>
+    `${pre}<a href="https://x.com/${name}" data-ext="1">@${name}</a>`);
+  return out;
+}
+function fmtTime(unix){
+  const d = new Date(unix * 1000);
+  return d.getHours().toString().padStart(2,'0') + ':' + d.getMinutes().toString().padStart(2,'0');
+}
+function dayLabel(unix){
+  const d = new Date(unix * 1000);
+  const now = new Date();
+  const ymd = x => x.getFullYear() + '-' + x.getMonth() + '-' + x.getDate();
+  const wd = ['日','月','火','水','木','金','土'][d.getDay()];
+  const base = `${d.getMonth()+1}月${d.getDate()}日（${wd}）`;
+  if (ymd(d) === ymd(now)) return '今日 · ' + base;
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (ymd(d) === ymd(y)) return '昨日 · ' + base;
+  if (d.getFullYear() === now.getFullYear()) return base;
+  return `${d.getFullYear()}年` + base;
+}
+function getKey(){
+  const q = new URLSearchParams(location.search).get('k');
+  if (q){ localStorage.setItem(LS_KEY, q); history.replaceState(null, '', location.pathname); return q; }
+  return localStorage.getItem(LS_KEY) || '';
+}
+async function rpc(fn, body){
+  const r = await fetch(SUPABASE_URL + '/rest/v1/rpc/' + fn, {
+    method: 'POST',
+    headers: { apikey: ANON_KEY, Authorization: 'Bearer ' + ANON_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+  if (!r.ok) throw new Error('rpc ' + r.status);
+  return r.json();
+}
+function gate(msg){
+  app.innerHTML = `<div class="gate"><div>${esc(msg || '鍵が必要です')}</div>
+    <input id="keyin" type="password" placeholder="合言葉" autocomplete="off">
+    <button id="keybtn">開く</button></div>`;
+  document.getElementById('keybtn').onclick = () => {
+    const v = document.getElementById('keyin').value.trim();
+    if (v){ localStorage.setItem(LS_KEY, v); load(); }
+  };
+}
+function accountOf(username){
+  for (const p of feed.people) for (const a of p.accounts) if (a.username === username) return {person: p, account: a};
+  return {person: null, account: {username, displayName: username, avatarUrl: ''}};
+}
+function render(){
+  const people = feed.people || [];
+  if (!people.length){ app.innerHTML = '<div class="empty">まだ何もありません</div>'; return; }
+  if (!filterPerson || !people.some(p => p.slug === filterPerson)) filterPerson = people[0].slug;
+  const person = people.find(p => p.slug === filterPerson);
+  const userSet = new Set(person.accounts.map(a => a.username));
+  let posts = (feed.posts || []).filter(t => userSet.has(t.username));
+  if (filterAccount) posts = posts.filter(t => t.username === filterAccount);
+  if (keyword) posts = posts.filter(t => t.text.includes(keyword));
+
+  let h = '';
+  h += `<header class="top"><h1>${esc(person.name)}のポスト</h1><div class="sub">${esc(person.bio || '')}</div></header><div class="rule"></div>`;
+  if (people.length > 1){
+    h += '<div class="chips">' + people.map(p =>
+      `<span class="chip ${p.slug === filterPerson ? 'on' : ''}" data-person="${esc(p.slug)}">${esc(p.name)}</span>`).join('') + '</div>';
+  }
+  h += '<div class="chips"><span class="chip ' + (filterAccount ? '' : 'on') + '" data-acc="">すべて</span>' +
+    person.accounts.map(a =>
+      `<span class="chip ${filterAccount === a.username ? 'on' : ''}" data-acc="${esc(a.username)}">@${esc(a.username)}（${a.postCount}）</span>`).join('') + '</div>';
+  h += `<div class="search"><input id="kw" type="search" placeholder="キーワードで探す" value="${esc(keyword)}"></div>`;
+
+  if (!posts.length) h += '<div class="empty">ポストがありません</div>';
+  let lastDay = '';
+  for (const t of posts){
+    const dl = dayLabel(t.createdAtUnix);
+    if (dl !== lastDay){ h += `<div class="day">${esc(dl)}</div>`; lastDay = dl; }
+    const {account} = accountOf(t.username);
+    let bodyText = t.text, rtHead = '', origChip = '';
+    const m = t.isRetweet && t.text.match(/^RT @([A-Za-z0-9_]+):\s*/);
+    if (m){
+      rtHead = `<p class="rt-head"><b>${esc(account.displayName || t.username)}</b> さんがリポスト</p>`;
+      origChip = `<a class="orig" href="https://x.com/${m[1]}" data-ext="1">↻ @${esc(m[1])} さんのポスト</a>`;
+      bodyText = t.text.slice(m[0].length);
+    }
+    const media = (t.media || []).slice(0, 4);
+    let mediaHtml = '';
+    if (media.length){
+      mediaHtml = `<div class="media n${media.length}">` + media.map(md =>
+        md.type === 'video'
+          ? `<span class="vwrap"><img src="${esc(md.url)}" loading="lazy" alt=""><span class="vmark">動画</span></span>`
+          : `<img src="${esc(md.url)}" loading="lazy" alt="">`
+      ).join('') + '</div>';
+    }
+    h += `<article class="card" data-url="${esc(t.url)}">
+      ${rtHead}
+      <div class="who">
+        ${account.avatarUrl ? `<img src="${esc(account.avatarUrl)}" alt="">` : ''}
+        <div><div class="nm">${esc(account.displayName || t.username)}</div><div class="un">@${esc(t.username)}</div></div>
+        <div class="tm">${fmtTime(t.createdAtUnix)}</div>
+      </div>
+      ${origChip}
+      <p class="body">${linkify(bodyText)}</p>
+      ${mediaHtml}
+      <div class="counts"><span>♥ ${t.likeCount}</span><span>↻ ${t.retweetCount}</span><span>表示 ${t.viewCount}</span><span class="open-hint">Xで開く ↗</span></div>
+    </article>`;
+  }
+  h += '<p class="foot">新しいポストは自動で積み上がります</p>';
+  app.innerHTML = h;
+
+  app.querySelectorAll('[data-person]').forEach(el => el.onclick = () => { filterPerson = el.dataset.person; filterAccount = ''; render(); });
+  app.querySelectorAll('[data-acc]').forEach(el => el.onclick = () => { filterAccount = el.dataset.acc; render(); });
+  const kw = document.getElementById('kw');
+  kw.oninput = () => { keyword = kw.value; const pos = kw.selectionStart; render(); const k2 = document.getElementById('kw'); k2.focus(); k2.setSelectionRange(pos, pos); };
+  app.querySelectorAll('.card').forEach(c => c.addEventListener('click', e => {
+    if (e.target.closest('a')) return;
+    window.open(c.dataset.url, '_blank');
+  }));
+  app.querySelectorAll('a[data-ext]').forEach(a => a.addEventListener('click', e => e.stopPropagation()));
+}
+async function load(){
+  const key = getKey();
+  if (!key){ gate(); return; }
+  try {
+    feed = await rpc('xwatch_feed', { p_secret: key, p_limit: 300 });
+    render();
+  } catch (e) {
+    localStorage.removeItem(LS_KEY);
+    gate('鍵が違うか、読み込めませんでした');
+  }
+}
+load();
+</script>
+</body>
+</html>

@@ -104,6 +104,11 @@
     border-radius:999px; padding:6px 18px; font-size:13px; cursor:pointer;
   }
   .bar button:disabled{opacity:.55}
+  .keychg{text-align:center; margin:4px 0 8px}
+  .keychg-btn{background:none; border:none; color:var(--muted); font-size:12px; text-decoration:underline; cursor:pointer; padding:6px}
+  .keychg input{border:1px solid var(--line); background:var(--card); border-radius:10px; padding:8px 11px; font-size:14px; color:var(--ink); outline:none; width:210px; max-width:60vw}
+  .keychg-go{border:1px solid var(--green); background:var(--green); color:#f5f1e6; border-radius:10px; padding:8px 14px; font-size:13px; cursor:pointer; margin-left:6px}
+  .keychg-msg{font-size:12px; color:var(--green); margin-top:7px; min-height:1em}
 </style>
 </head>
 <body>
@@ -247,10 +252,30 @@ function render(){
     h += '</div>';
   }
   h += '<p class="foot">新しいポストは自動で積み上がります</p>';
+  h += '<div class="keychg"><button id="keychg-open" class="keychg-btn">合言葉を変更</button><div id="keychg-area"></div></div>';
   app.innerHTML = h;
 
   const rb = document.getElementById('refresh');
   if (rb) rb.onclick = async () => { refreshing = true; render(); await load(true); refreshing = false; render(); };
+  const ko = document.getElementById('keychg-open');
+  if (ko) ko.onclick = () => {
+    const area = document.getElementById('keychg-area');
+    area.innerHTML = '<div style="margin-top:8px"><input id="newkey" type="password" placeholder="新しい合言葉（4文字以上）" autocomplete="new-password"><button id="keychg-go" class="keychg-go">変更する</button><div class="keychg-msg" id="keychg-msg"></div></div>';
+    document.getElementById('keychg-go').onclick = async () => {
+      const v = document.getElementById('newkey').value.trim();
+      const msg = document.getElementById('keychg-msg');
+      if (v.length < 4){ msg.textContent = '4文字以上にしてください'; return; }
+      msg.textContent = '変更中…';
+      try {
+        await rpc('xwatch_change_secret', { p_secret: getKey(), p_new: v });
+        localStorage.setItem(LS_KEY, v);
+        msg.textContent = '変更しました。次からは新しい合言葉です';
+        document.getElementById('newkey').value = '';
+      } catch (e) {
+        msg.textContent = '変更できませんでした';
+      }
+    };
+  };
   const mb = document.getElementById('more');
   if (mb) mb.onclick = () => { loadMore(); };
   app.querySelectorAll('[data-person]').forEach(el => el.onclick = () => { filterPerson = el.dataset.person; filterAccount = ''; render(); });
